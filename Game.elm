@@ -89,17 +89,26 @@ update action model =
 
 handleTick : Time -> Model -> Model
 handleTick delta model =
-  (addWorkerValue delta >> addTowerValue delta) model
+  let clicks = clicksPerDelta delta model
+  in {model| bank = model.bank + clicks }
 
-addWorkerValue : Time -> Model -> Model
-addWorkerValue delta model =
-  let rate = 1
-  in { model | bank = model.bank + (model.workers * rate * delta) }
+workerValue : Model -> Float
+workerValue model =
+  model.workers
 
-addTowerValue : Time -> Model -> Model
-addTowerValue delta model =
-  let rate = 6
-  in { model | bank = model.bank + (model.towers * rate * delta) }
+towerValue : Model -> Float
+towerValue model =
+  model.towers * 6
+
+clicksPerDelta : Time -> Model -> Float
+clicksPerDelta delta model =
+  ((workerValue model) + (towerValue model)) * delta 
+
+
+clicksPerSecond : Model -> Float
+clicksPerSecond model =
+  clicksPerDelta second model / 1000
+
 
 -- STYLES
 
@@ -129,8 +138,9 @@ view address model =
   div [ bodyStyle ]
     [ div [ onClick address Increment ] [ text "click me" ]
     , div [] [ strText (floor model.bank) ]
+    , div [] [ text <| "+ " ++ (toString <| clicksPerSecond model) ++ " per second" ]
     , table []
-      [ tr [ if model.bank <= (workerCost model) then greyText else blackText ]
+      [ tr [ if model.bank < (workerCost model) then greyText else blackText ]
         [ td [] [ strText (workerCost model) ]
         , td [] [ text "+1" ]
         , td
