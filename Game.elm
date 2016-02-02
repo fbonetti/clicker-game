@@ -80,7 +80,7 @@ update action model =
         model
     BuyTower ->
       if model.bank >= (towerCost model) then
-        { model | towers = model.towers + 1, bank = model.bank - (workerCost model) }
+        { model | towers = model.towers + 1, bank = model.bank - (towerCost model) }
       else
         model
     NoOp ->
