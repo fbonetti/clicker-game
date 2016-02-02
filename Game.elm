@@ -5,6 +5,7 @@ import Html.Events exposing (onClick)
 import Html.Attributes exposing (style)
 import Signal exposing (Mailbox, Address, mailbox)
 import Time exposing (..)
+import String exposing (repeat)
 
 -- SIGNALS
 
@@ -136,6 +137,7 @@ view address model =
           [ onClick address BuyWorker ]
           [ text "worker" ]
         , td [] [ strText model.workers ]
+        , td [] [ text <| repeat (floor model.workers) "." ]
         ]
       , tr [ if model.bank <= (towerCost model) then greyText else blackText ]
         [ td [] [ strText (towerCost model) ]
@@ -144,6 +146,7 @@ view address model =
           [ onClick address BuyTower ]
           [ text "tower" ]
         , td [] [ strText model.towers ]
+        , td [] [ text <| repeat (floor model.towers) "|" ]
         ]
       ]
     ]
