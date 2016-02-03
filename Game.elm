@@ -13,14 +13,14 @@ main : Signal Html
 main =
   Signal.map (view inputs.address) (Signal.foldp update init mergedSignals)
 
-ticker : Signal Time
-ticker =
-  fps 60
+elapsedSeconds : Signal Time
+elapsedSeconds =
+  Signal.map (\t -> t / 1000) (fps 60)
 
 mergedSignals : Signal Action
 mergedSignals =
   Signal.mergeMany
-    [ Signal.map Tick ticker
+    [ Signal.map Tick elapsedSeconds
     , inputs.signal
     ]
 
@@ -73,7 +73,7 @@ update action model =
     Increment ->
       { model | bank = model.bank + model.clickRate }
     Tick delta ->
-      handleTick (delta / 1000) model
+      handleTick delta model
     BuyWorker ->
       if model.bank >= (workerCost model) then
         { model | workers = model.workers + 1, bank = model.bank - (workerCost model) }
@@ -106,8 +106,8 @@ clicksPerDelta delta model =
 
 
 clicksPerSecond : Model -> Float
-clicksPerSecond model =
-  clicksPerDelta second model / 1000
+clicksPerSecond =
+  clicksPerDelta 1
 
 
 -- STYLES
