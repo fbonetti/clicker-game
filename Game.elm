@@ -94,7 +94,7 @@ handleTick delta model =
   let 
     clicks = clicksPerDelta delta model
   in
-    {model| bank = (model.bank + clicks) - (toFloat <| laneDamage <| moveEnemies model.lane),
+    {model| bank = model.bank + clicks - (toFloat <| laneDamage model.lane),
             lane = moveEnemies <| addBarbarian model model.lane
     }
 
