@@ -23,7 +23,7 @@ elapsedSeconds =
 
 everyThreeSeconds : Signal Time
 everyThreeSeconds =
-  every (second * 3)
+  every <| 3 * second 
 
 mergedSignals : Signal Action
 mergedSignals =
@@ -99,15 +99,46 @@ update action model =
       if model.workers > 0 then
         {model | lane = addBarbarian model.lane}
       else
-        model    
+        model  
     NoOp ->
       model
 
 handleTick : Time -> Model -> Model
 handleTick delta model =
-  let clicks = clicksPerDelta delta model
-  in {model| bank = model.bank + clicks - (laneDamage delta model.lane),
-             lane = moveEnemies delta model.lane}
+  model |>
+  takeDamage delta |> 
+  updateBank delta |>
+  moveEnemies delta |>
+  fireTowers delta
+
+takeDamage : Time -> Model -> Model
+takeDamage delta model =
+  {model | workers = max 0.0 <| model.workers - (workerDamage delta model.lane),
+           bank = max 0.0 <| model.bank - (clickDamage delta model.lane)}
+
+updateBank : Time -> Model -> Model
+updateBank delta model =
+  let 
+    clicks = clicksPerDelta delta model
+  in
+    {model | bank = model.bank + clicks}
+
+moveEnemies : Time -> Model -> Model
+moveEnemies delta model =
+  {model | lane = moveLaneEnemies delta model.lane}
+
+fireTowers : Time -> Model -> Model
+fireTowers delta model =
+  {model | lane = takeTowerDamage model.lane (Debug.watch "damage" (delta * model.towers) * 0.25)}
+
+clickDamage : Time -> Lane -> Float
+clickDamage delta lane =
+  sum <| map .power <| reachingBase delta lane
+
+workerDamage : Time -> Lane -> Float
+workerDamage delta lane =
+  sum <| map .workers <| reachingBase delta lane
+
 
 workerValue : Model -> Float
 workerValue model =
@@ -119,7 +150,7 @@ towerValue model =
 
 clicksPerDelta : Time -> Model -> Float
 clicksPerDelta delta model =
-  ((workerValue model) + (towerValue model)) * delta 
+  workerValue model * delta 
 
 
 clicksPerSecond : Model -> Float
@@ -139,13 +170,19 @@ startingLane =
   , enemies = []
   }
 
-moveEnemies : Time -> Lane -> Lane
-moveEnemies delta lane =
+takeTowerDamage : Lane -> Float -> Lane
+takeTowerDamage lane amount =
+  {lane| enemies =
+    filter (.defense >> ((<) 0.0)) <| doDamage amount <| reverse lane.enemies
+  }
+
+moveLaneEnemies : Time -> Lane -> Lane
+moveLaneEnemies delta lane =
   {lane | enemies = filter (reachedBase lane >> not) <| map (moveEnemy delta) lane.enemies}
 
-laneDamage : Time -> Lane -> Float
-laneDamage delta lane =
-  sum <| map .power <| filter (wouldReachBase delta lane) lane.enemies
+reachingBase : Time -> Lane -> List Enemy
+reachingBase delta lane =
+  filter (wouldReachBase delta lane) lane.enemies
 
 renderLane : Lane -> Html
 renderLane lane =
@@ -169,6 +206,7 @@ type alias Enemy =
   , defense: Float
   , position: Float
   , speed: Float
+  , workers: Float
   }
 
 enemyToForm : Lane -> Enemy -> Form
@@ -182,10 +220,11 @@ enemyPosition lane enemy =
 barbarian : Enemy
 barbarian = 
   { name = "Barbarian"
-  , power = 10.0
+  , power = 6.0
   , defense = 1.0
   , position = 0.0
-  , speed = 1
+  , speed = 0.5
+  , workers = 1.0
   }
 
 moveEnemy : Time -> Enemy -> Enemy
@@ -196,10 +235,15 @@ reachedBase : Lane -> Enemy -> Bool
 reachedBase lane enemy =
   enemy.position >= lane.length
 
+doDamage : Float -> List Enemy -> List Enemy
+doDamage damage enemies =
+  case enemies of
+    [] -> []
+    (enemy::rest) -> {enemy| defense = enemy.defense - damage} :: rest
 
 wouldReachBase : Time -> Lane -> Enemy -> Bool
 wouldReachBase delta lane enemy =
-  (enemy.position + (enemy.speed * delta)) >= lane.length
+  (moveEnemy delta enemy).position >= lane.length
 
 -- STYLES
 
@@ -228,10 +272,14 @@ htext : String -> Html
 htext value =
   Html.text value
 
+hbutton : List Attribute -> String -> Html
+hbutton click value =
+  button click [htext value]
+
 view : Address Action -> Model -> Html
 view address model =
   div [ bodyStyle ]
-    [ div [ onClick address Increment ] [ htext "click me" ]
+    [ hbutton [ onClick address Increment ] "click me"
     , div [] [ strText (floor model.bank) ]
     , div [] [ htext <| "+ " ++ (toString <| clicksPerSecond model) ++ " per second" ]
     , table []
@@ -239,17 +287,17 @@ view address model =
         [ td [] [ strText (workerCost model) ]
         , td [] [ htext "+1" ]
         , td
-          [ onClick address BuyWorker ]
-          [ htext "worker" ]
+          []
+          [ hbutton [onClick address BuyWorker] "worker" ]
         , td [] [ strText model.workers ]
         , td [] [ htext <| String.repeat (floor model.workers) "." ]
         ]
       , tr [ if model.bank <= (towerCost model) then greyText else blackText ]
         [ td [] [ strText (towerCost model) ]
-        , td [] [ htext "+6" ]
+        , td [] [  ]
         , td
-          [ onClick address BuyTower ]
-          [ htext "tower" ]
+          []
+          [ hbutton [onClick address BuyTower] "tower" ]
         , td [] [ strText model.towers ]
         , td [] [ htext <| String.repeat (floor model.towers) "|" ]
         ]
